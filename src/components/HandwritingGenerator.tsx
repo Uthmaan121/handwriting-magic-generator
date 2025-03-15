@@ -28,6 +28,9 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
   const [paperStyle, setPaperStyle] = useState<'white' | 'lined' | 'grid' | 'yellow'>('lined');
   const [inkColor, setInkColor] = useState<'blue' | 'black' | 'dark-blue'>('blue');
   const [sampleCount, setSampleCount] = useState<number>(0);
+  const [penStyle, setPenStyle] = useState<'fountain' | 'ballpoint' | 'pencil'>('fountain');
+  const [pressure, setPressure] = useState<number>(70);
+  const [shakiness, setShakiness] = useState<number>(50);
 
   useEffect(() => {
     const hasStoredSample = localStorage.getItem('hasHandwritingSample') === 'true';
@@ -53,8 +56,16 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
     setLineSpacing(value[0]);
   };
 
-  // Function to create lined paper background
-  const createLinedPaperBackground = (
+  const handlePressureChange = (value: number[]) => {
+    setPressure(value[0]);
+  };
+
+  const handleShakinessChange = (value: number[]) => {
+    setShakiness(value[0]);
+  };
+
+  // Function to create realistic paper texture
+  const createPaperTexture = (
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -68,87 +79,466 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
     }
     ctx.fillRect(0, 0, width, height);
     
-    // Add paper texture
-    for (let i = 0; i < width * height * 0.01; i++) {
-      const x = Math.random() * width;
-      const y = Math.random() * height;
-      const size = Math.random() * 2;
-      const opacity = Math.random() * 0.03;
+    // Add realistic paper texture with fiber patterns
+    const createFiberTexture = () => {
+      const textureCanvas = document.createElement('canvas');
+      const textureCtx = textureCanvas.getContext('2d');
+      textureCanvas.width = width;
+      textureCanvas.height = height;
       
-      ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-      ctx.fillRect(x, y, size, size);
-    }
+      if (textureCtx) {
+        // Base color
+        textureCtx.fillStyle = 'rgba(249, 247, 241, 1)';
+        textureCtx.fillRect(0, 0, width, height);
+        
+        // Create paper fibers
+        for (let i = 0; i < width * height * 0.003; i++) {
+          const fiberLength = 5 + Math.random() * 20;
+          const fiberWidth = 0.5 + Math.random() * 1.5;
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          const angle = Math.random() * Math.PI * 2;
+          
+          textureCtx.save();
+          textureCtx.translate(x, y);
+          textureCtx.rotate(angle);
+          
+          // Random fiber color (slight variations of off-white)
+          const r = 245 + Math.random() * 10;
+          const g = 240 + Math.random() * 10;
+          const b = 230 + Math.random() * 15;
+          const a = 0.1 + Math.random() * 0.2;
+          
+          textureCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+          textureCtx.fillRect(-fiberLength/2, -fiberWidth/2, fiberLength, fiberWidth);
+          textureCtx.restore();
+        }
+        
+        // Add subtle noise for texture
+        for (let x = 0; x < width; x += 2) {
+          for (let y = 0; y < height; y += 2) {
+            if (Math.random() > 0.85) {
+              const r = 220 + Math.floor(Math.random() * 20);
+              const g = 215 + Math.floor(Math.random() * 20);
+              const b = 205 + Math.floor(Math.random() * 20);
+              const a = 0.01 + Math.random() * 0.05;
+              
+              textureCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+              textureCtx.fillRect(x, y, 2, 2);
+            }
+          }
+        }
+        
+        // Add paper creases and imperfections
+        const creaseCount = 2 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < creaseCount; i++) {
+          const startX = Math.random() * width;
+          const startY = Math.random() * height;
+          const endX = startX + (Math.random() - 0.5) * width * 0.8;
+          const endY = startY + (Math.random() - 0.5) * height * 0.8;
+          
+          const gradient = textureCtx.createLinearGradient(startX, startY, endX, endY);
+          gradient.addColorStop(0, 'rgba(200, 200, 200, 0)');
+          gradient.addColorStop(0.5, 'rgba(200, 200, 200, 0.05)');
+          gradient.addColorStop(1, 'rgba(200, 200, 200, 0)');
+          
+          textureCtx.save();
+          textureCtx.lineWidth = 1 + Math.random() * 2;
+          textureCtx.strokeStyle = gradient;
+          textureCtx.beginPath();
+          textureCtx.moveTo(startX, startY);
+          
+          // Create slightly curved crease
+          const controlX1 = startX + (endX - startX) * 0.3 + (Math.random() - 0.5) * 50;
+          const controlY1 = startY + (endY - startY) * 0.3 + (Math.random() - 0.5) * 50;
+          const controlX2 = startX + (endX - startX) * 0.7 + (Math.random() - 0.5) * 50;
+          const controlY2 = startY + (endY - startY) * 0.7 + (Math.random() - 0.5) * 50;
+          
+          textureCtx.bezierCurveTo(controlX1, controlY1, controlX2, controlY2, endX, endY);
+          textureCtx.stroke();
+          textureCtx.restore();
+        }
+        
+        // Apply texture to main canvas
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.drawImage(textureCanvas, 0, 0);
+        ctx.restore();
+      }
+    };
     
+    createFiberTexture();
+    
+    // Add slightly curved or worn edges
+    const edgeEffect = () => {
+      // Top edge shadow/wear
+      const topGradient = ctx.createLinearGradient(0, 0, 0, height * 0.02);
+      topGradient.addColorStop(0, 'rgba(0, 0, 0, 0.1)');
+      topGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = topGradient;
+      ctx.fillRect(0, 0, width, height * 0.02);
+      
+      // Left edge shadow/wear
+      const leftGradient = ctx.createLinearGradient(0, 0, width * 0.02, 0);
+      leftGradient.addColorStop(0, 'rgba(0, 0, 0, 0.1)');
+      leftGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = leftGradient;
+      ctx.fillRect(0, 0, width * 0.02, height);
+      
+      // Right edge subtle darkening
+      const rightGradient = ctx.createLinearGradient(width, 0, width - width * 0.01, 0);
+      rightGradient.addColorStop(0, 'rgba(0, 0, 0, 0.05)');
+      rightGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = rightGradient;
+      ctx.fillRect(width - width * 0.01, 0, width * 0.01, height);
+      
+      // Bottom edge subtle darkening
+      const bottomGradient = ctx.createLinearGradient(0, height, 0, height - height * 0.01);
+      bottomGradient.addColorStop(0, 'rgba(0, 0, 0, 0.05)');
+      bottomGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = bottomGradient;
+      ctx.fillRect(0, height - height * 0.01, width, height * 0.01);
+    };
+    
+    edgeEffect();
+    
+    // Add paper-specific elements
     if (style === 'lined' || style === 'yellow') {
-      // Draw horizontal lines
-      const lineSpacingPx = Math.max(fontSize * lineSpacing, 30); // Minimum spacing
-      ctx.strokeStyle = style === 'yellow' ? 'rgba(0, 0, 150, 0.2)' : 'rgba(0, 0, 200, 0.15)';
+      // Draw horizontal lines with proper spacing based on font size
+      const lineSpacingPx = Math.max(fontSize * lineSpacing, 24);
+      const lineOpacity = style === 'yellow' ? 0.2 : 0.15;
+      const lineRGB = style === 'yellow' ? '0, 0, 150' : '0, 0, 200';
+      
+      ctx.strokeStyle = `rgba(${lineRGB}, ${lineOpacity})`;
       ctx.lineWidth = 1;
       
-      for (let y = lineSpacingPx; y < height; y += lineSpacingPx) {
+      // Start lines higher on the page based on font size to ensure text aligns with lines
+      const firstLineY = Math.max(lineSpacingPx, fontSize);
+      
+      for (let y = firstLineY; y < height; y += lineSpacingPx) {
+        // Add slight waviness to the lines for realism
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
+        let prevX = 0;
+        const segments = 20;
+        const segmentWidth = width / segments;
+        
+        for (let i = 0; i <= segments; i++) {
+          const x = i * segmentWidth;
+          // Subtle vertical variation
+          const yVariation = Math.random() * 1.2 - 0.6;
+          
+          if (i === 0) {
+            ctx.moveTo(x, y + yVariation);
+          } else {
+            // Create a slightly curved segment
+            const controlPoint = prevX + segmentWidth / 2;
+            const controlYVariation = Math.random() * 1.5 - 0.75;
+            ctx.quadraticCurveTo(controlPoint, y + controlYVariation, x, y + yVariation);
+          }
+          
+          prevX = x;
+        }
         ctx.stroke();
       }
       
       // Add red margin line if it's lined paper
       if (style === 'lined') {
         ctx.strokeStyle = 'rgba(255, 0, 0, 0.2)';
+        // Add slight waviness to the margin line
         ctx.beginPath();
-        ctx.moveTo(40, 0);
-        ctx.lineTo(40, height);
+        const marginX = 40;
+        let prevY = 0;
+        const segments = 15;
+        const segmentHeight = height / segments;
+        
+        for (let i = 0; i <= segments; i++) {
+          const y = i * segmentHeight;
+          // Subtle horizontal variation
+          const xVariation = Math.random() * 2 - 1;
+          
+          if (i === 0) {
+            ctx.moveTo(marginX + xVariation, y);
+          } else {
+            // Create a slightly curved segment
+            const controlPoint = prevY + segmentHeight / 2;
+            const controlXVariation = Math.random() * 2.5 - 1.25;
+            ctx.quadraticCurveTo(marginX + controlXVariation, controlPoint, marginX + xVariation, y);
+          }
+          
+          prevY = y;
+        }
         ctx.stroke();
       }
     } else if (style === 'grid') {
-      // Draw grid
-      const gridSize = 30;
+      // Draw grid with imperfections
+      const gridSize = Math.max(30, fontSize * 1.2); // Scale grid with font size
       ctx.strokeStyle = 'rgba(0, 0, 200, 0.1)';
       ctx.lineWidth = 0.5;
       
-      // Horizontal lines
+      // Horizontal lines with slight imperfections
       for (let y = gridSize; y < height; y += gridSize) {
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
+        for (let x = 0; x < width; x += 10) {
+          const yVar = y + (Math.random() - 0.5) * 0.7;
+          if (x === 0) {
+            ctx.moveTo(x, yVar);
+          } else {
+            ctx.lineTo(x, yVar);
+          }
+        }
         ctx.stroke();
       }
       
-      // Vertical lines
+      // Vertical lines with slight imperfections
       for (let x = gridSize; x < width; x += gridSize) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
+        for (let y = 0; y < height; y += 10) {
+          const xVar = x + (Math.random() - 0.5) * 0.7;
+          if (y === 0) {
+            ctx.moveTo(xVar, y);
+          } else {
+            ctx.lineTo(xVar, y);
+          }
+        }
         ctx.stroke();
       }
     }
     
-    // Add subtle shadow at edges for realism
-    const shadowWidth = 15;
-    
-    // Top shadow
-    const topGradient = ctx.createLinearGradient(0, 0, 0, shadowWidth);
-    topGradient.addColorStop(0, 'rgba(0, 0, 0, 0.1)');
-    topGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = topGradient;
-    ctx.fillRect(0, 0, width, shadowWidth);
-    
-    // Left shadow
-    const leftGradient = ctx.createLinearGradient(0, 0, shadowWidth, 0);
-    leftGradient.addColorStop(0, 'rgba(0, 0, 0, 0.1)');
-    leftGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = leftGradient;
-    ctx.fillRect(0, 0, shadowWidth, height);
-    
-    // Add slightly bent corner
-    if (Math.random() > 0.5) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    // Add slight coffee stain or fingerprint in random location (rare)
+    if (Math.random() > 0.75) {
+      const stainX = Math.random() * width * 0.8 + width * 0.1;
+      const stainY = Math.random() * height * 0.8 + height * 0.1;
+      const stainSize = 20 + Math.random() * 60;
+      
+      const stainGradient = ctx.createRadialGradient(
+        stainX, stainY, stainSize * 0.1,
+        stainX, stainY, stainSize
+      );
+      
+      // Coffee stain or fingerprint
+      if (Math.random() > 0.5) {
+        // Coffee stain
+        stainGradient.addColorStop(0, 'rgba(139, 69, 19, 0.15)');
+        stainGradient.addColorStop(0.7, 'rgba(139, 69, 19, 0.03)');
+        stainGradient.addColorStop(1, 'rgba(139, 69, 19, 0)');
+      } else {
+        // Fingerprint
+        stainGradient.addColorStop(0, 'rgba(100, 100, 100, 0.05)');
+        stainGradient.addColorStop(0.8, 'rgba(100, 100, 100, 0.01)');
+        stainGradient.addColorStop(1, 'rgba(100, 100, 100, 0)');
+      }
+      
+      ctx.fillStyle = stainGradient;
       ctx.beginPath();
-      ctx.moveTo(width, 0);
-      ctx.lineTo(width - 40, 0);
-      ctx.lineTo(width, 35);
+      ctx.arc(stainX, stainY, stainSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Add bent corner 
+    if (Math.random() > 0.4) {
+      // Decide which corner to bend
+      const cornerIndex = Math.floor(Math.random() * 4);
+      let cornerX = 0, cornerY = 0;
+      
+      switch (cornerIndex) {
+        case 0: // top-right
+          cornerX = width;
+          cornerY = 0;
+          break;
+        case 1: // bottom-right
+          cornerX = width;
+          cornerY = height;
+          break;
+        case 2: // bottom-left
+          cornerX = 0;
+          cornerY = height;
+          break;
+        case 3: // top-left
+          cornerX = 0;
+          cornerY = 0;
+          break;
+      }
+      
+      const bendSize = 25 + Math.random() * 30;
+      const shadowSize = bendSize * 1.2;
+      
+      // Shadow under the bent corner
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.beginPath();
+      
+      if (cornerIndex === 0) { // top-right
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX - shadowSize, cornerY);
+        ctx.lineTo(cornerX, cornerY + shadowSize);
+      } else if (cornerIndex === 1) { // bottom-right
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX - shadowSize, cornerY);
+        ctx.lineTo(cornerX, cornerY - shadowSize);
+      } else if (cornerIndex === 2) { // bottom-left
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX + shadowSize, cornerY);
+        ctx.lineTo(cornerX, cornerY - shadowSize);
+      } else { // top-left
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX + shadowSize, cornerY);
+        ctx.lineTo(cornerX, cornerY + shadowSize);
+      }
+      
       ctx.closePath();
       ctx.fill();
+      
+      // Lighter triangle for the bent part
+      ctx.fillStyle = style === 'yellow' ? '#f5eecc' : '#f4f2ec';
+      ctx.beginPath();
+      
+      if (cornerIndex === 0) { // top-right
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX - bendSize, cornerY);
+        ctx.lineTo(cornerX, cornerY + bendSize);
+      } else if (cornerIndex === 1) { // bottom-right
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX - bendSize, cornerY);
+        ctx.lineTo(cornerX, cornerY - bendSize);
+      } else if (cornerIndex === 2) { // bottom-left
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX + bendSize, cornerY);
+        ctx.lineTo(cornerX, cornerY - bendSize);
+      } else { // top-left
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX + bendSize, cornerY);
+        ctx.lineTo(cornerX, cornerY + bendSize);
+      }
+      
+      ctx.closePath();
+      ctx.fill();
+    }
+  };
+
+  // Function to get base character style based on pen type
+  const getPenStyle = (ctx: CanvasRenderingContext2D, color: string) => {
+    const baseAlpha = 0.85 + (pressure / 200);
+    
+    if (penStyle === 'fountain') {
+      // Fountain pen - variable line width, dark rich color
+      ctx.lineWidth = 1.2 + (pressure / 100);
+      
+      if (color === 'blue') {
+        return `rgba(0, 20, 120, ${baseAlpha})`;
+      } else if (color === 'dark-blue') {
+        return `rgba(0, 0, 70, ${baseAlpha})`;
+      } else {
+        return `rgba(10, 10, 30, ${baseAlpha})`;
+      }
+    } else if (penStyle === 'ballpoint') {
+      // Ballpoint - thinner, more consistent lines
+      ctx.lineWidth = 0.8 + (pressure / 150);
+      
+      if (color === 'blue') {
+        return `rgba(0, 50, 180, ${baseAlpha})`;
+      } else if (color === 'dark-blue') {
+        return `rgba(0, 10, 100, ${baseAlpha})`;
+      } else {
+        return `rgba(20, 20, 40, ${baseAlpha})`;
+      }
+    } else {
+      // Pencil - lighter, grayer
+      ctx.lineWidth = 0.7 + (pressure / 120);
+      
+      if (color === 'blue') {
+        return `rgba(40, 60, 100, ${baseAlpha - 0.1})`;
+      } else if (color === 'dark-blue') {
+        return `rgba(30, 40, 80, ${baseAlpha - 0.1})`;
+      } else {
+        return `rgba(60, 60, 70, ${baseAlpha - 0.1})`;
+      }
+    }
+  };
+
+  // Function to simulate realistic ink flow
+  const simulateInkFlow = (
+    ctx: CanvasRenderingContext2D, 
+    x: number, 
+    y: number, 
+    char: string, 
+    messinessFactor: number,
+    sampleMultiplier: number
+  ) => {
+    // Base ink opacity varies with pressure
+    const baseOpacity = Math.min(0.95, 0.7 + (pressure / 100));
+    
+    // Ink pooling/bleeding at random points (where pen slows or stops)
+    if (penStyle !== 'pencil' && messinessFactor > 40 && Math.random() > 0.7) {
+      const poolSize = 1.5 + (Math.random() * messinessFactor / 30);
+      const poolOpacity = Math.min(0.7, baseOpacity + 0.1);
+      
+      // Calculate color based on ink color but slightly darker
+      let poolColor;
+      if (inkColor === 'blue') {
+        poolColor = `rgba(0, 10, 90, ${poolOpacity})`;
+      } else if (inkColor === 'dark-blue') {
+        poolColor = `rgba(0, 0, 60, ${poolOpacity})`;
+      } else {
+        poolColor = `rgba(0, 0, 0, ${poolOpacity})`;
+      }
+      
+      ctx.save();
+      ctx.fillStyle = poolColor;
+      ctx.beginPath();
+      
+      // Create irregular ink pool shape
+      const centerX = x + (Math.random() - 0.5) * 5;
+      const centerY = y + (Math.random() - 0.5) * 5;
+      
+      // Create random blob shape
+      ctx.beginPath();
+      const blobPoints = 5 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < blobPoints; i++) {
+        const angle = (i / blobPoints) * Math.PI * 2;
+        const radius = poolSize * (0.7 + Math.random() * 0.6);
+        const blobX = centerX + Math.cos(angle) * radius;
+        const blobY = centerY + Math.sin(angle) * radius;
+        
+        if (i === 0) {
+          ctx.moveTo(blobX, blobY);
+        } else {
+          const controlX = centerX + Math.cos(angle - Math.PI/blobPoints) * radius * 1.2;
+          const controlY = centerY + Math.sin(angle - Math.PI/blobPoints) * radius * 1.2;
+          ctx.quadraticCurveTo(controlX, controlY, blobX, blobY);
+        }
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    
+    // For pencil, add graphite smudges
+    if (penStyle === 'pencil' && messinessFactor > 30 && Math.random() > 0.8) {
+      const smudgeWidth = 5 + Math.random() * 10;
+      const smudgeHeight = 2 + Math.random() * 3;
+      const smudgeOpacity = 0.05 + Math.random() * 0.1;
+      
+      ctx.save();
+      ctx.fillStyle = `rgba(30, 30, 30, ${smudgeOpacity})`;
+      ctx.beginPath();
+      
+      // Create smudge with irregular edges
+      const smudgeX = x + (Math.random() - 0.5) * 10;
+      const smudgeY = y + (Math.random() - 0.5) * 10;
+      const rotation = Math.random() * Math.PI;
+      
+      ctx.translate(smudgeX, smudgeY);
+      ctx.rotate(rotation);
+      
+      // Create irregular shape
+      ctx.beginPath();
+      ctx.moveTo(-smudgeWidth/2, -smudgeHeight/2);
+      ctx.lineTo(smudgeWidth/2, -smudgeHeight/2 + (Math.random() - 0.5) * 2);
+      ctx.lineTo(smudgeWidth/2 + (Math.random() - 0.5) * 3, smudgeHeight/2 + (Math.random() - 0.5) * 2);
+      ctx.lineTo(-smudgeWidth/2 + (Math.random() - 0.5) * 3, smudgeHeight/2);
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.restore();
     }
   };
 
@@ -167,67 +557,127 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
     // Base randomness factor from messiness parameter (0-100)
     const randomFactor = messinessFactor / 100 * Math.max(0.8, Math.min(1.5, sampleMultiplier));
     
-    // Different handwriting qualities based on sample count
-    const baseLineVariation = sampleCount > 2 ? 0.7 : 1.2;
+    // Different handwriting qualities based on sample count and messiness
+    const baseLineVariation = (sampleCount > 2) ? 
+                              Math.max(0.7, messinessFactor / 100) : 
+                              Math.max(1.0, messinessFactor / 80);
+    
+    // Calculate shakiness effect based on shakiness slider
+    const shakinessFactor = shakiness / 50; // 0-2 range
     
     // Track baseline for realistic handwriting flow
     let baselineY = y;
     let prevChar = '';
+    let letterCount = 0;
+    
+    // Randomly determine if this line slants up or down
+    const lineSlant = (Math.random() - 0.5) * (messinessFactor / 200);
+    
+    // Track when pen needs to be "re-inked" - causing darker spots
+    let inkLevel = 1.0;
+    const inkDepletionRate = 0.01 + (Math.random() * 0.02);
+    
+    // For pressure variations across the text
+    let currentPressure = pressure * (0.9 + Math.random() * 0.2);
     
     chars.forEach((char, i) => {
-      // Handwriting naturally flows up and down - more samples = more natural flow
+      letterCount++;
+      
+      // Adjust baseline as we move across the page (subtle slant up or down)
+      baselineY += lineSlant;
+      
+      // More natural baseline variation that flows up and down
       if (i % Math.floor(4 + Math.random() * 3) === 0) {
-        baselineY = y + (Math.random() - 0.5) * fontSize * 0.15 * randomFactor;
+        // More extreme baseline changes with higher messiness
+        const variationRange = fontSize * 0.15 * (messinessFactor / 70);
+        baselineY = y + lineSlant * letterCount + (Math.random() - 0.5) * variationRange * randomFactor;
       }
       
-      // Random vertical position variation
-      const yVariation = baselineY + (Math.random() - 0.5) * fontSize * baseLineVariation * randomFactor;
+      // Apply shakiness effect
+      const shakyX = currentX + (Math.random() - 0.5) * shakinessFactor * 3;
+      const shakyY = baselineY + (Math.random() - 0.5) * shakinessFactor * 3;
+      
+      // Calculate random vertical position with more variation for higher messiness
+      const yVariation = shakyY + (Math.random() - 0.5) * fontSize * baseLineVariation * randomFactor;
       
       // Random character rotation - more samples = more consistent rotation
-      const rotationFactor = sampleCount > 3 ? 0.04 : 0.08;
-      const rotation = (Math.random() - 0.5) * rotationFactor * randomFactor;
+      const rotationVariation = sampleCount > 3 ? 0.04 : 0.08;
+      // More rotation variation with higher messiness and shakiness
+      const rotationFactor = rotationVariation * (messinessFactor / 70) * (1 + shakinessFactor * 0.5);
+      const rotation = (Math.random() - 0.5) * rotationFactor;
       
-      // Random character size variation
-      const sizeVariation = 1 + (Math.random() - 0.5) * 0.12 * randomFactor;
+      // Random character size variation (more with higher messiness)
+      const sizeVariationAmount = 0.12 * (messinessFactor / 70);
+      const sizeVariation = 1 + (Math.random() - 0.5) * sizeVariationAmount * randomFactor;
       
       // Letter slant for cursive effect
-      const slant = (Math.random() * 0.05 + 0.01) * randomFactor;
+      const slantVariation = (0.03 + Math.random() * 0.07) * (messinessFactor / 80);
+      const slant = (Math.random() * slantVariation + 0.01) * randomFactor;
+      
+      // Calculate ink darkness based on current ink level and pressure
+      const currentPressureFactor = 0.7 + (currentPressure / 100) * 0.3;
+      
+      // Simulate running out of ink slightly
+      inkLevel -= inkDepletionRate;
+      if (inkLevel < 0.5) {
+        // "Re-ink" the pen
+        inkLevel = 0.9 + Math.random() * 0.1;
+      }
+      
+      // Vary pressure randomly through the text
+      if (i % Math.floor(3 + Math.random() * 5) === 0) {
+        currentPressure = pressure * (0.8 + Math.random() * 0.4);
+      }
       
       // Save context state
       ctx.save();
       
       // Apply random rotation centered on the character position
-      ctx.translate(currentX, yVariation);
+      ctx.translate(shakyX, yVariation);
       ctx.rotate(rotation);
       ctx.scale(sizeVariation, sizeVariation);
       
       // Apply slant transform for cursive effect
       ctx.transform(1, 0, slant, 1, 0, 0);
       
-      // Adjust pressure (line width) randomly for some characters
-      if (Math.random() > 0.7) {
-        ctx.lineWidth = 1 + Math.random() * randomFactor;
-        const origFillStyle = ctx.fillStyle;
-        // Darken some characters slightly for ink variation
-        const alpha = 0.85 + Math.random() * 0.15;
-        // Use the same color but with varying alpha
-        if (typeof origFillStyle === 'string') {
-          const rgba = origFillStyle.replace('rgba', '').replace('rgb', '').replace(/[()]/g, '').split(',');
-          if (rgba.length >= 3) {
-            ctx.fillStyle = `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, ${alpha})`;
-          }
-        }
+      // Set ink color with variations for realism
+      const basePenStyle = getPenStyle(ctx, inkColor);
+      // Extract the rgba values for manipulation
+      const rgbaMatch = basePenStyle.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+      
+      if (rgbaMatch) {
+        const r = parseInt(rgbaMatch[1]);
+        const g = parseInt(rgbaMatch[2]);
+        const b = parseInt(rgbaMatch[3]);
+        // Base alpha from pen style, modified by pressure, ink level, and messiness
+        const alpha = parseFloat(rgbaMatch[4]) * currentPressureFactor * inkLevel;
+        
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      } else {
+        ctx.fillStyle = basePenStyle;
       }
       
-      // Draw the character with slight random variations
+      // Simulate ink flow and bleeding with additional effects
+      simulateInkFlow(ctx, 0, 0, char, messinessFactor, sampleMultiplier);
+      
+      // Draw the character with all the randomness
       ctx.fillText(char, 0, 0);
+      
+      // For pencil, add additional graphite marks for realism
+      if (penStyle === 'pencil' && messinessFactor > 30 && Math.random() > 0.7) {
+        // Double stroke some parts to simulate pencil inconsistency
+        ctx.fillStyle = `rgba(60, 60, 70, 0.2)`;
+        ctx.fillText(char, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5);
+      }
       
       // Add connecting line for certain character pairs (cursive effect)
       if (prevChar && "oearictsnml".includes(prevChar) && "oearictsnml".includes(char) && Math.random() > 0.3) {
         const connectorX = -ctx.measureText(char).width * 0.5;
         ctx.beginPath();
         ctx.moveTo(connectorX, 0);
-        ctx.lineTo(0, 0);
+        // Add slight curve to the connector line
+        const controlY = (Math.random() - 0.5) * 3;
+        ctx.quadraticCurveTo(connectorX / 2, controlY, 0, 0);
         ctx.stroke();
       }
       
@@ -244,8 +694,9 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
         spacingFactor = specialPairs[char as keyof typeof specialPairs];
       }
       
-      // Random spacing variation
-      const spacingVariation = spacingFactor * (1 + (Math.random() - 0.5) * 0.1 * randomFactor);
+      // More variation in spacing with higher messiness
+      const spacingVariationAmount = 0.1 * (1 + messinessFactor / 100);
+      const spacingVariation = spacingFactor * (1 + (Math.random() - 0.5) * spacingVariationAmount * randomFactor);
       currentX += charWidth * spacingVariation;
       
       prevChar = char;
@@ -282,19 +733,19 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
         canvas.height = canvasHeight;
         
         // Create paper background based on selected style
-        createLinedPaperBackground(ctx, canvasWidth, canvasHeight, paperStyle);
+        createPaperTexture(ctx, canvasWidth, canvasHeight, paperStyle);
         
         // Set text properties based on ink color
-        ctx.font = `${fontSize}px 'Segoe Script', cursive`;
-        
-        // Set ink color
-        if (inkColor === 'blue') {
-          ctx.fillStyle = 'rgba(0, 20, 120, 0.85)';
-        } else if (inkColor === 'dark-blue') {
-          ctx.fillStyle = 'rgba(0, 0, 70, 0.9)';
-        } else {
-          ctx.fillStyle = 'rgba(10, 10, 30, 0.9)';
+        let fontFamily;
+        if (penStyle === 'fountain') {
+          fontFamily = "'Segoe Script', 'Comic Sans MS', cursive";
+        } else if (penStyle === 'ballpoint') {
+          fontFamily = "'Comic Sans MS', 'Segoe Script', cursive";
+        } else { // pencil
+          fontFamily = "'Comic Sans MS', 'Segoe Script', cursive";
         }
+        
+        ctx.font = `${fontSize}px ${fontFamily}`;
         
         // Handle alignment
         ctx.textAlign = alignment as CanvasTextAlign;
@@ -310,8 +761,15 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
           x = canvasWidth - 50;
         }
         
-        // Determine starting Y position
-        const baseY = Math.max(fontSize * 1.5, 70);
+        // Determine starting Y position - properly align with the lines
+        let baseY;
+        if (paperStyle === 'lined' || paperStyle === 'yellow') {
+          // Align with the first line
+          const lineSpacingPx = Math.max(fontSize * lineSpacing, 24);
+          baseY = Math.max(lineSpacingPx, fontSize);
+        } else {
+          baseY = Math.max(fontSize * 1.5, 70);
+        }
         
         // Calculate sample quality multiplier (more samples = better quality)
         const sampleMultiplier = Math.min(1 + (sampleCount * 0.1), 1.5);
@@ -321,15 +779,16 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
         let currentY = baseY;
         
         lines.forEach((line, index) => {
-          // Add some random line height variation
-          const lineHeightVariation = 1 + (Math.random() - 0.5) * 0.1;
+          // Add some random line height variation - more variation with higher messiness
+          const lineVariationAmount = 0.15 * (messiness / 70);
+          const lineHeightVariation = 1 + (Math.random() - 0.5) * lineVariationAmount;
           currentY += (index > 0) ? fontSize * lineSpacing * lineHeightVariation : 0;
           
           // Use the custom function to draw text with randomness
           const lineWidth = addRandomnessToText(ctx, line, x, currentY, messiness, sampleMultiplier);
           
           // Add random ink splotches and dots for realism
-          if (messiness > 40) {
+          if (messiness > 40 && penStyle !== 'pencil') {
             const splotchCount = Math.floor((messiness / 20) * Math.random() * 3);
             
             for (let i = 0; i < splotchCount; i++) {
@@ -339,18 +798,72 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
               
               ctx.save();
               // Use the same ink color but slightly darker
-              ctx.fillStyle = inkColor === 'blue' ? 'rgba(0, 10, 100, 0.7)' : 'rgba(0, 0, 0, 0.7)';
+              let splotchColor;
+              if (inkColor === 'blue') {
+                splotchColor = 'rgba(0, 10, 100, 0.7)';
+              } else if (inkColor === 'dark-blue') {
+                splotchColor = 'rgba(0, 0, 80, 0.7)';
+              } else {
+                splotchColor = 'rgba(0, 0, 0, 0.7)';
+              }
+              
+              ctx.fillStyle = splotchColor;
               ctx.beginPath();
-              ctx.arc(splotchX, splotchY, splotchSize, 0, Math.PI * 2);
+              
+              // Create irregular ink splotch
+              if (Math.random() > 0.5) {
+                // Round splotch
+                ctx.arc(splotchX, splotchY, splotchSize, 0, Math.PI * 2);
+              } else {
+                // Irregular splotch
+                ctx.moveTo(splotchX, splotchY);
+                for (let a = 0; a < Math.PI * 2; a += Math.PI/4) {
+                  const radius = splotchSize * (0.7 + Math.random() * 0.6);
+                  const ptX = splotchX + Math.cos(a) * radius;
+                  const ptY = splotchY + Math.sin(a) * radius;
+                  ctx.lineTo(ptX, ptY);
+                }
+                ctx.closePath();
+              }
+              
               ctx.fill();
               ctx.restore();
             }
           }
+          
+          // For pencil style, add eraser marks and smudges
+          if (penStyle === 'pencil' && messiness > 50 && Math.random() > 0.6) {
+            const eraserX = x + Math.random() * lineWidth;
+            const eraserY = currentY + (Math.random() - 0.5) * fontSize * 2;
+            const eraserWidth = 5 + Math.random() * 15;
+            const eraserHeight = 3 + Math.random() * 8;
+            
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.beginPath();
+            
+            // Create eraser mark with rotation
+            ctx.translate(eraserX, eraserY);
+            ctx.rotate(Math.random() * Math.PI * 2);
+            ctx.fillRect(-eraserWidth/2, -eraserHeight/2, eraserWidth, eraserHeight);
+            
+            ctx.restore();
+            
+            // Add graphite smudge near eraser mark
+            ctx.save();
+            ctx.fillStyle = 'rgba(30, 30, 30, 0.1)';
+            ctx.beginPath();
+            ctx.translate(eraserX + (Math.random() - 0.5) * 10, eraserY + (Math.random() - 0.5) * 10);
+            ctx.rotate(Math.random() * Math.PI * 2);
+            ctx.fillRect(-eraserWidth*0.7, -eraserHeight*0.7, eraserWidth*1.4, eraserHeight*0.5);
+            ctx.restore();
+          }
         });
         
         // Add random ink smudges
-        if (messiness > 50) {
-          const smudgeCount = Math.floor(messiness / 20);
+        if (messiness > 50 && penStyle !== 'pencil') {
+          const smudgeCount = Math.floor(messiness / 15);
           
           for (let i = 0; i < smudgeCount; i++) {
             const smudgeX = Math.random() * canvasWidth;
@@ -362,26 +875,83 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
             ctx.save();
             ctx.translate(smudgeX, smudgeY);
             ctx.rotate(smudgeRotation);
-            ctx.fillStyle = inkColor === 'blue' ? 'rgba(0, 20, 150, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-            ctx.fillRect(-smudgeWidth/2, -smudgeHeight/2, smudgeWidth, smudgeHeight);
+            
+            if (inkColor === 'blue') {
+              ctx.fillStyle = 'rgba(0, 20, 150, 0.1)';
+            } else if (inkColor === 'dark-blue') {
+              ctx.fillStyle = 'rgba(0, 0, 100, 0.1)';
+            } else {
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            }
+            
+            // Create jagged smudge shape
+            ctx.beginPath();
+            ctx.moveTo(-smudgeWidth/2, -smudgeHeight/2);
+            
+            // Top edge with jags
+            for (let x = -smudgeWidth/2; x < smudgeWidth/2; x += smudgeWidth/8) {
+              const jagY = -smudgeHeight/2 + (Math.random() - 0.5) * smudgeHeight * 0.5;
+              ctx.lineTo(x, jagY);
+            }
+            
+            // Right edge
+            ctx.lineTo(smudgeWidth/2, -smudgeHeight/2);
+            ctx.lineTo(smudgeWidth/2, smudgeHeight/2);
+            
+            // Bottom edge with jags
+            for (let x = smudgeWidth/2; x > -smudgeWidth/2; x -= smudgeWidth/8) {
+              const jagY = smudgeHeight/2 + (Math.random() - 0.5) * smudgeHeight * 0.5;
+              ctx.lineTo(x, jagY);
+            }
+            
+            // Left edge
+            ctx.lineTo(-smudgeWidth/2, smudgeHeight/2);
+            ctx.closePath();
+            ctx.fill();
             ctx.restore();
           }
         }
         
         // Add fingerprint smudge for high messiness
-        if (messiness > 75 && Math.random() > 0.6) {
+        if (messiness > 70 && Math.random() > 0.5) {
           const fpX = Math.random() * canvasWidth;
           const fpY = Math.random() * canvasHeight;
-          const fpRadius = 10 + Math.random() * 20;
+          const fpRadius = 15 + Math.random() * 25;
           
           ctx.save();
           const gradient = ctx.createRadialGradient(fpX, fpY, 0, fpX, fpY, fpRadius);
-          gradient.addColorStop(0, 'rgba(100, 100, 100, 0.02)');
-          gradient.addColorStop(1, 'rgba(100, 100, 100, 0)');
+          
+          if (penStyle === 'pencil') {
+            gradient.addColorStop(0, 'rgba(80, 80, 80, 0.05)');
+            gradient.addColorStop(1, 'rgba(80, 80, 80, 0)');
+          } else {
+            if (inkColor === 'blue') {
+              gradient.addColorStop(0, 'rgba(0, 20, 120, 0.05)');
+              gradient.addColorStop(1, 'rgba(0, 20, 120, 0)');
+            } else if (inkColor === 'dark-blue') {
+              gradient.addColorStop(0, 'rgba(0, 0, 60, 0.05)');
+              gradient.addColorStop(1, 'rgba(0, 0, 60, 0)');
+            } else {
+              gradient.addColorStop(0, 'rgba(0, 0, 0, 0.05)');
+              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            }
+          }
+          
           ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.arc(fpX, fpY, fpRadius, 0, Math.PI * 2);
-          ctx.fill();
+          
+          // Add fingerprint pattern
+          for (let i = 0; i < 10; i++) {
+            const arcRadius = fpRadius * (0.5 + Math.random() * 0.5);
+            const arcStartAngle = Math.random() * Math.PI * 2;
+            const arcEndAngle = arcStartAngle + Math.PI * (0.2 + Math.random() * 0.8);
+            
+            ctx.beginPath();
+            ctx.arc(fpX, fpY, arcRadius, arcStartAngle, arcEndAngle);
+            ctx.lineWidth = 1 + Math.random() * 2;
+            ctx.strokeStyle = ctx.fillStyle;
+            ctx.stroke();
+          }
+          
           ctx.restore();
         }
         
@@ -470,7 +1040,39 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                   onValueChange={handleMessinessChange}
                   disabled={!hasSample}
                 />
-                <p className="text-xs text-gray-500">Controls how messy and variable the handwriting appears</p>
+                <p className="text-xs text-gray-500">Controls how messy the handwriting appears</p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label>Shakiness</Label>
+                  <span className="text-xs text-gray-500">{shakiness}%</span>
+                </div>
+                <Slider 
+                  defaultValue={[shakiness]} 
+                  max={100} 
+                  min={0} 
+                  step={5}
+                  onValueChange={handleShakinessChange}
+                  disabled={!hasSample}
+                />
+                <p className="text-xs text-gray-500">Controls hand trembling effect</p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label>Pressure</Label>
+                  <span className="text-xs text-gray-500">{pressure}%</span>
+                </div>
+                <Slider 
+                  defaultValue={[pressure]} 
+                  max={100} 
+                  min={20} 
+                  step={5}
+                  onValueChange={handlePressureChange}
+                  disabled={!hasSample}
+                />
+                <p className="text-xs text-gray-500">Controls pen/pencil pressure</p>
               </div>
               
               <div className="space-y-2">
@@ -490,6 +1092,39 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
             </div>
             
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Pen Style</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button 
+                    variant={penStyle === 'fountain' ? 'default' : 'outline'} 
+                    className="justify-start"
+                    onClick={() => setPenStyle('fountain')}
+                    disabled={!hasSample}
+                  >
+                    <div className="w-4 h-4 bg-blue-900 rounded-full mr-2"></div>
+                    Fountain
+                  </Button>
+                  <Button 
+                    variant={penStyle === 'ballpoint' ? 'default' : 'outline'} 
+                    className="justify-start"
+                    onClick={() => setPenStyle('ballpoint')}
+                    disabled={!hasSample}
+                  >
+                    <div className="w-4 h-4 bg-blue-700 rounded-full mr-2"></div>
+                    Ballpoint
+                  </Button>
+                  <Button 
+                    variant={penStyle === 'pencil' ? 'default' : 'outline'} 
+                    className="justify-start"
+                    onClick={() => setPenStyle('pencil')}
+                    disabled={!hasSample}
+                  >
+                    <div className="w-4 h-4 bg-gray-600 rounded-full mr-2"></div>
+                    Pencil
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label>Text Alignment</Label>
                 <div className="flex space-x-2">
@@ -579,7 +1214,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                     variant={inkColor === 'blue' ? 'default' : 'outline'} 
                     className="justify-start"
                     onClick={() => setInkColor('blue')}
-                    disabled={!hasSample}
+                    disabled={!hasSample || penStyle === 'pencil'}
                   >
                     <div className="w-4 h-4 bg-blue-700 rounded-full mr-2"></div>
                     Blue
@@ -588,7 +1223,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                     variant={inkColor === 'black' ? 'default' : 'outline'} 
                     className="justify-start"
                     onClick={() => setInkColor('black')}
-                    disabled={!hasSample}
+                    disabled={!hasSample || penStyle === 'pencil'}
                   >
                     <div className="w-4 h-4 bg-gray-900 rounded-full mr-2"></div>
                     Black
@@ -597,7 +1232,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                     variant={inkColor === 'dark-blue' ? 'default' : 'outline'} 
                     className="justify-start"
                     onClick={() => setInkColor('dark-blue')}
-                    disabled={!hasSample}
+                    disabled={!hasSample || penStyle === 'pencil'}
                   >
                     <div className="w-4 h-4 bg-blue-900 rounded-full mr-2"></div>
                     Dark Blue
