@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +20,12 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
   const [alignment, setAlignment] = useState<'left' | 'center' | 'right'>('left');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [hasSample, setHasSample] = useState<boolean>(false);
+
+  useEffect(() => {
+    const hasStoredSample = localStorage.getItem('hasHandwritingSample') === 'true';
+    setHasSample(hasStoredSample);
+  }, [sampleId]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -30,19 +36,50 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
   };
 
   const generateHandwriting = () => {
-    if (!text.trim() || !sampleId) {
-      toast.error('Please enter some text first');
+    if (!text.trim() || !sampleId || !hasSample) {
+      toast.error('Please enter some text and ensure you have a handwriting sample');
       return;
     }
 
     setIsGenerating(true);
 
     // In a real app, this would send the text to a backend service that uses the sample
-    // Here we're simulating the generation
+    // Since we don't have a real backend, we'll use a placeholder image
     setTimeout(() => {
-      // For demo, we're just using the sample image from localStorage
-      const sampleImage = localStorage.getItem('handwritingSample');
-      setGeneratedImage(sampleImage);
+      // Create a canvas with text for demonstration purposes
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        canvas.width = 800;
+        canvas.height = 400;
+        
+        // Fill with paper background
+        ctx.fillStyle = '#f9f7f1';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Set text properties
+        ctx.font = `${fontSize}px 'Segoe Script', cursive`;
+        ctx.fillStyle = '#333';
+        
+        // Handle alignment
+        ctx.textAlign = alignment as CanvasTextAlign;
+        
+        // Position for text
+        const x = alignment === 'left' ? 50 : alignment === 'right' ? canvas.width - 50 : canvas.width / 2;
+        const y = 100;
+        
+        // Draw text
+        const lines = text.split('\n');
+        lines.forEach((line, index) => {
+          ctx.fillText(line, x, y + (index * fontSize * 1.5));
+        });
+        
+        // Get data URL
+        const dataUrl = canvas.toDataURL('image/png');
+        setGeneratedImage(dataUrl);
+      }
+      
       setIsGenerating(false);
       toast.success('Handwriting generated successfully!');
     }, 1500);
@@ -78,9 +115,9 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
               onChange={handleTextChange}
               rows={4}
               className="resize-none"
-              disabled={!sampleId}
+              disabled={!hasSample}
             />
-            {!sampleId && (
+            {!hasSample && (
               <p className="text-sm text-amber-500">
                 Please upload and process a handwriting sample first
               </p>
@@ -99,7 +136,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                 min={12} 
                 step={1}
                 onValueChange={handleFontSizeChange}
-                disabled={!sampleId}
+                disabled={!hasSample}
               />
             </div>
             
@@ -109,7 +146,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                 <Toggle 
                   pressed={alignment === 'left'} 
                   onPressedChange={() => setAlignment('left')}
-                  disabled={!sampleId}
+                  disabled={!hasSample}
                   aria-label="Align left"
                 >
                   <AlignLeft className="h-4 w-4" />
@@ -117,7 +154,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                 <Toggle 
                   pressed={alignment === 'center'} 
                   onPressedChange={() => setAlignment('center')}
-                  disabled={!sampleId}
+                  disabled={!hasSample}
                   aria-label="Align center"
                 >
                   <AlignCenter className="h-4 w-4" />
@@ -125,7 +162,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                 <Toggle 
                   pressed={alignment === 'right'} 
                   onPressedChange={() => setAlignment('right')}
-                  disabled={!sampleId}
+                  disabled={!hasSample}
                   aria-label="Align right"
                 >
                   <AlignRight className="h-4 w-4" />
@@ -136,7 +173,7 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
             <Button 
               className="w-full" 
               onClick={generateHandwriting}
-              disabled={!sampleId || isGenerating || !text.trim()}
+              disabled={!hasSample || isGenerating || !text.trim()}
             >
               <Type className="h-4 w-4 mr-2" />
               {isGenerating ? 'Generating...' : 'Generate Handwriting'}
@@ -150,22 +187,12 @@ export const HandwritingGenerator: React.FC<HandwritingGeneratorProps> = ({ samp
                 className="border rounded-lg overflow-hidden bg-paper p-4 flex justify-center"
                 style={{ textAlign: alignment }}
               >
-                <div className="relative max-w-full">
-                  <img 
-                    src={generatedImage} 
-                    alt="Generated handwriting" 
-                    className="max-h-[400px] object-contain"
-                    style={{ maxWidth: '100%' }}
-                  />
-                  <div 
-                    className="absolute inset-0 flex items-center justify-center"
-                    style={{ fontSize: `${fontSize}px` }}
-                  >
-                    <div className="handwriting-preview text-transparent">
-                      {text}
-                    </div>
-                  </div>
-                </div>
+                <img 
+                  src={generatedImage} 
+                  alt="Generated handwriting" 
+                  className="max-h-[400px] object-contain"
+                  style={{ maxWidth: '100%' }}
+                />
               </div>
               
               <Button 

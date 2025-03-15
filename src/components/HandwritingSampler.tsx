@@ -24,6 +24,12 @@ export const HandwritingSampler: React.FC<HandwritingSamplerProps> = ({ onSample
       return;
     }
 
+    // Check file size
+    if (file.size > 3 * 1024 * 1024) { // 3MB limit
+      toast.error('Image file is too large. Please upload an image smaller than 3MB');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       setImage(event.target?.result as string);
@@ -44,17 +50,27 @@ export const HandwritingSampler: React.FC<HandwritingSamplerProps> = ({ onSample
     // In a real app, this would send the image to a backend service
     // Here we're just simulating the processing
     setTimeout(() => {
-      setIsProcessing(false);
-      setIsProcessed(true);
-      // Generate a fake sample ID
-      const sampleId = `sample-${Date.now()}`;
-      
-      // Store the image in localStorage for our demo
-      localStorage.setItem('handwritingSample', image);
-      localStorage.setItem('handwritingSampleId', sampleId);
-      
-      toast.success('Handwriting sample processed successfully!');
-      onSampleProcessed(sampleId);
+      try {
+        // Generate a fake sample ID
+        const sampleId = `sample-${Date.now()}`;
+        
+        // Store a smaller version of the image or a reference instead of the full image
+        // For this demo, we'll just store the sample ID and use it in the generator
+        localStorage.setItem('handwritingSampleId', sampleId);
+        
+        // Instead of storing the full image, just store the fact that we have a sample
+        localStorage.setItem('hasHandwritingSample', 'true');
+        
+        setIsProcessing(false);
+        setIsProcessed(true);
+        
+        toast.success('Handwriting sample processed successfully!');
+        onSampleProcessed(sampleId);
+      } catch (error) {
+        console.error('Error storing handwriting sample:', error);
+        toast.error('Failed to process handwriting sample due to storage limitations');
+        setIsProcessing(false);
+      }
     }, 2000);
   };
 
